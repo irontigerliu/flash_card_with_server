@@ -60,6 +60,7 @@ socketIO.on("connection", (socket) => {
   socket.on("show_winner_and_next_question", (param) => {
     const user = users.find((row) => row.socketid === socket.id);
     if (user) {
+      user.point += 5;
       currentCardId = param.nextQuestionId;
       socket.emit("show_winner_and_next_question", {
         nextQuestionId: param.nextQuestionId,
@@ -77,8 +78,9 @@ socketIO.on("connection", (socket) => {
   socket.on("change_user_point", (param) => {
     const user = users.find((row) => row.socketid === socket.id);
     if (user) {
-      if (param.plus) user.point += 5;
-      else user.point -= 5;
+      if (!param.plus && user.point > 0) {
+        user.point -= 5;
+      }
       socket.emit("users_state_refreshed", users);
       socket.broadcast.emit("users_state_refreshed", users);
     }
