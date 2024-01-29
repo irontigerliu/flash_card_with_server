@@ -3,9 +3,13 @@ const express = require("express");
 const path = require("path");
 const app = express();
 const PORT = 4000;
-const users = [];
+type user = {
+  userid: number;
+  socketid: any; avatar: string; name: string; email: string; point: number; joined: boolean;
+}
+const users: user[]= [];
 let autoUserId = 0;
-let currentCardId = 0;
+let selectedQuestionId = 0;
 
 //New imports
 const http = require("http").Server(app);
@@ -18,11 +22,11 @@ const socketIO = require("socket.io")(http, {
 });
 
 //Add this before the app.get() block
-socketIO.on("connection", (socket) => {
+socketIO.on("connection", (socket: any) => {
   autoUserId++;
 
   users.push({
-    id: autoUserId,
+    userid: autoUserId,
     socketid: socket.id,
     avatar: "./assets/images/users/user" + autoUserId + ".png",
     name: "user" + autoUserId,
@@ -32,11 +36,11 @@ socketIO.on("connection", (socket) => {
   });
 
   socket.emit("users_state_refreshed", users);
-  socket.emit("receive_init_question_number", currentCardId);
+  socket.emit("receive_init_question_number", selectedQuestionId);
 
   socket.on("disconnect", () => {
     users.splice(
-      users.findIndex((user) => user.userid === socket.id),
+      users.findIndex((user) => user.socketid === socket.id),
       1
     );
   });
@@ -57,25 +61,28 @@ socketIO.on("connection", (socket) => {
     socket.broadcast.emit("users_state_refreshed", users);
   });
 
-  socket.on("show_winner_and_next_question", (param) => {
-    const user = users.find((row) => row.socketid === socket.id);
-    if (user) {
-      user.point += 5;
-      currentCardId = param.nextQuestionId;
-      socket.emit("show_winner_and_next_question", {
-        nextQuestionId: param.nextQuestionId,
-        winner: user,
-        answer: param.answer,
-      });
-      socket.broadcast.emit("show_winner_and_next_question", {
-        nextQuestionId: param.nextQuestionId,
-        winner: user,
-        answer: param.answer,
-      });
+  socket.on(
+    "show_winner_and_next_question",
+    (param: { answer: string; nextQuestionId: number }) => {
+      const user = users.find((row) => row.socketid === socket.id);
+      if (user) {
+        user.point += 5;
+        selectedQuestionId = param.nextQuestionId;
+        socket.emit("show_winner_and_next_question", {
+          nextQuestionId: param.nextQuestionId,
+          winner: user,
+          answer: param.answer,
+        });
+        socket.broadcast.emit("show_winner_and_next_question", {
+          nextQuestionId: param.nextQuestionId,
+          winner: user,
+          answer: param.answer,
+        });
+      }
     }
-  });
+  );
 
-  socket.on("change_user_point", (param) => {
+  socket.on("change_user_point", (param: { plus: boolean }) => {
     const user = users.find((row) => row.socketid === socket.id);
     if (user) {
       if (!param.plus && user.point > 0) {
@@ -89,7 +96,7 @@ socketIO.on("connection", (socket) => {
 
 app.use(cors());
 
-app.get("/api", (req, res) => {
+app.get("/api", (req: any, res: any) => {
   res.json({
     message: "Hello world",
   });
@@ -97,7 +104,7 @@ app.get("/api", (req, res) => {
 
 app.use(express.static(path.resolve(__dirname, "./build")));
 
-app.get("*", (req, res) => {
+app.get("*", (req: any, res: any) => {
   res.sendFile(path.resolve(__dirname, "./build", "index.html"));
 });
 
