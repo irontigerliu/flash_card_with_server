@@ -1,15 +1,21 @@
-/* eslint-disable no-undef */
 const express = require("express");
 const path = require("path");
 const app = express();
 const PORT = 4000;
 type user = {
   userid: number;
-  socketid: any; avatar: string; name: string; email: string; point: number; joined: boolean;
-}
-const users: user[]= [];
+  socketid: string;
+  avatar: string;
+  name: string;
+  email: string;
+  point: number;
+  joined: boolean;
+};
+const users: user[] = [];
 let autoUserId = 0;
 let selectedQuestionId = 0;
+let currentQuestionNum = 1;
+let gameStarted = false;
 
 //New imports
 const http = require("http").Server(app);
@@ -17,12 +23,12 @@ const cors = require("cors");
 
 const socketIO = require("socket.io")(http, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "http://localhost:3001",
   },
 });
 
 //Add this before the app.get() block
-socketIO.on("connection", (socket: any) => {
+socketIO.on("connection", (socket) => {
   autoUserId++;
 
   users.push({
@@ -36,13 +42,17 @@ socketIO.on("connection", (socket: any) => {
   });
 
   socket.emit("users_state_refreshed", users);
-  socket.emit("receive_init_question_number", selectedQuestionId);
+  socket.emit("receive_init_question_id", selectedQuestionId);
+  socket.emit("receive_current_question_number", currentQuestionNum);
+  socket.emit("receive_game_state", gameStarted);
 
   socket.on("disconnect", () => {
     users.splice(
       users.findIndex((user) => user.socketid === socket.id),
       1
     );
+
+    socket.emit("users_state_refreshed", users);
   });
 
   socket.on("user_join_request", () => {
@@ -67,7 +77,21 @@ socketIO.on("connection", (socket: any) => {
       const user = users.find((row) => row.socketid === socket.id);
       if (user) {
         user.point += 5;
+        currentQuestionNum++;
         selectedQuestionId = param.nextQuestionId;
+
+        if (currentQuestionNum == 16) {
+          currentQuestionNum = 0;
+          socket.emit("game_finished");
+          socket.broadcast.emit("game_finished");
+          gameStarted = false;
+        } else {
+          socket.emit("receive_current_question_number", currentQuestionNum);
+          socket.broadcast.emit(
+            "receive_current_question_number",
+            currentQuestionNum
+          );
+        }
         socket.emit("show_winner_and_next_question", {
           nextQuestionId: param.nextQuestionId,
           winner: user,
@@ -92,11 +116,17 @@ socketIO.on("connection", (socket: any) => {
       socket.broadcast.emit("users_state_refreshed", users);
     }
   });
+
+  socket.on("game_started", () => {
+    gameStarted = true;
+    socket.emit("game_started");
+    socket.broadcast.emit("game_started");
+  });
 });
 
 app.use(cors());
 
-app.get("/api", (req: any, res: any) => {
+app.get("/api", (req, res) => {
   res.json({
     message: "Hello world",
   });
@@ -104,7 +134,7 @@ app.get("/api", (req: any, res: any) => {
 
 app.use(express.static(path.resolve(__dirname, "./build")));
 
-app.get("*", (req: any, res: any) => {
+app.get("*", (req, res) => {
   res.sendFile(path.resolve(__dirname, "./build", "index.html"));
 });
 
