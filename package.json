@@ -4,7 +4,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "mkdir dist \\s \\q && babel ./ -s -d dist",
-    "start": "nodemon --exec ts-node index",
+    "start": "nodemon --exec npx ts-node index",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
